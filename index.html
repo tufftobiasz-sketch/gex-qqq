@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GEX QQQ — Tobias</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      color: #1a1a2e;
+      /* jasne, delikatne tło z kolorowymi plamami */
+      background:
+        radial-gradient(circle at 15% 20%, #dbeafe 0%, transparent 45%),
+        radial-gradient(circle at 85% 15%, #fce7f3 0%, transparent 45%),
+        radial-gradient(circle at 50% 90%, #d1fae5 0%, transparent 50%),
+        #f4f6fb;
+      padding: 24px;
+    }
+
+    .wrap { max-width: 1100px; margin: 0 auto; }
+
+    /* szklane karty z blur */
+    .glass {
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      border-radius: 22px;
+      box-shadow: 0 8px 32px rgba(31, 38, 135, 0.12);
+    }
+
+    .hero { padding: 32px 36px; margin-bottom: 22px; }
+    .hero h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+    .hero p { color: #5b6478; margin-top: 6px; font-size: 15px; }
+
+    /* górne kafelki z poziomami */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .stat { padding: 18px 20px; }
+    .stat .label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #8a92a6; }
+    .stat .value { font-size: 24px; font-weight: 700; margin-top: 6px; }
+    .stat .sub { font-size: 12px; color: #8a92a6; margin-top: 2px; }
+
+    .c-spot   { color: #2563eb; }
+    .c-call   { color: #16a34a; }
+    .c-put    { color: #dc2626; }
+    .c-inflec { color: #9333ea; }
+
+    /* baner typu dnia */
+    .dayban { padding: 20px 24px; margin-bottom: 22px; display: flex; align-items: center; gap: 16px; }
+    .dayban .badge {
+      font-size: 18px; font-weight: 800; padding: 10px 18px; border-radius: 14px; white-space: nowrap;
+    }
+    .badge.balance { background: rgba(22,163,74,.15); color: #15803d; }
+    .badge.trend   { background: rgba(220,38,38,.15); color: #b91c1c; }
+    .dayban .desc { font-size: 14px; color: #4b5568; }
+
+    .chartcard { padding: 18px; }
+    #chart { width: 100%; height: 620px; }
+
+    .footer { text-align: center; color: #9aa2b6; font-size: 12px; margin-top: 18px; }
+    .refresh {
+      cursor: pointer; border: none; background: rgba(37,99,235,.12); color: #2563eb;
+      font-weight: 600; padding: 8px 16px; border-radius: 12px; font-size: 13px;
+    }
+    .refresh:hover { background: rgba(37,99,235,.2); }
+
+    .loading, .error { padding: 40px; text-align: center; font-size: 16px; }
+    .error { color: #dc2626; }
+
+    @media (max-width: 640px) {
+      body { padding: 14px; }
+      .hero { padding: 24px; }
+      .hero h1 { font-size: 21px; }
+      #chart { height: 520px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <div class="glass hero">
+      <h1>Welcome Tobias 👋 here's ur trading informations, have fun</h1>
+      <p>Gamma Exposure (GEX) dla <b id="tk">QQQ</b> · ostatnia aktualizacja: <span id="upd">—</span>
+         &nbsp;<button class="refresh" onclick="load()">↻ Odśwież</button></p>
+    </div>
+
+    <div id="content">
+      <div class="glass loading">⏳ Pobieram dane opcji QQQ…</div>
+    </div>
+
+    <div class="footer">Dane: yfinance (~15 min opóźnienia) · Open Interest aktualizowany raz dziennie · Tylko do użytku osobistego</div>
+  </div>
+
+<script>
+// Jeśli strona otwarta jako plik (file://) zamiast przez serwer,
+// celuj wprost w lokalny serwer Flask.
+const API = (location.protocol === 'file:' || !location.host)
+  ? 'http://localhost:5000/api/gex'
+  : '/api/gex';
+
+async function load() {
+  const content = document.getElementById('content');
+  content.innerHTML = '<div class="glass loading">⏳ Pobieram dane opcji QQQ…</div>';
+  try {
+    const res = await fetch(API);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+    render(json.data);
+  } catch (e) {
+    content.innerHTML = '<div class="glass error">❌ Błąd: ' + e.message +
+      '<br><br>Spróbuj odświeżyć. Jeśli giełda jest zamknięta, dane mogą być niedostępne.</div>';
+  }
+}
+
+function render(d) {
+  document.getElementById('tk').textContent = d.ticker;
+  document.getElementById('upd').textContent = d.updated;
+
+  const content = document.getElementById('content');
+  content.innerHTML = `
+    <div class="stats">
+      <div class="glass stat"><div class="label">Spot</div><div class="value c-spot">$${d.spot}</div><div class="sub">cena ${d.ticker}</div></div>
+      <div class="glass stat"><div class="label">Call Wall</div><div class="value c-call">$${d.call_wall}</div><div class="sub">opór</div></div>
+      <div class="glass stat"><div class="label">Put Wall</div><div class="value c-put">$${d.put_wall}</div><div class="sub">wsparcie</div></div>
+      <div class="glass stat"><div class="label">Inflection</div><div class="value c-inflec">$${d.inflection}</div><div class="sub">gamma flip</div></div>
+    </div>
+
+    <div class="glass dayban">
+      <div class="badge ${d.day_state}">${d.day_type}</div>
+      <div class="desc">${d.day_desc}</div>
+    </div>
+
+    <div class="glass chartcard"><div id="chart"></div></div>
+  `;
+
+  drawChart(d);
+}
+
+function drawChart(d) {
+  const callTrace = {
+    type: 'bar', orientation: 'h', name: 'Call GEX',
+    y: d.strikes, x: d.call_gex,
+    marker: { color: 'rgba(22,163,74,0.75)' }
+  };
+  const putTrace = {
+    type: 'bar', orientation: 'h', name: 'Put GEX',
+    y: d.strikes, x: d.put_gex,
+    marker: { color: 'rgba(220,38,38,0.75)' }
+  };
+  const netTrace = {
+    type: 'scatter', mode: 'lines', name: 'Net GEX (Cumulative)',
+    y: d.strikes, x: d.cumulative_gex,
+    line: { color: '#f59e0b', width: 3 }
+  };
+
+  const shapes = [
+    hline(d.spot,       '#2563eb', 'Spot $' + d.spot,           'dash',    'left'),
+    hline(d.call_wall,  '#16a34a', 'Call Wall $' + d.call_wall, 'dot',     'right'),
+    hline(d.put_wall,   '#dc2626', 'Put Wall $' + d.put_wall,   'dot',     'right'),
+    hline(d.inflection, '#9333ea', 'Inflection $' + d.inflection, 'dashdot', 'right'),
+  ];
+
+  const layout = {
+    barmode: 'overlay',
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(255,255,255,0.3)',
+    font: { color: '#1a1a2e', family: 'Segoe UI, sans-serif' },
+    margin: { l: 60, r: 120, t: 30, b: 40 },
+    xaxis: { title: 'GEX', zeroline: true, zerolinecolor: '#aab', gridcolor: 'rgba(0,0,0,0.06)' },
+    yaxis: { title: 'Strike', gridcolor: 'rgba(0,0,0,0.06)', dtick: 5, tickfont: { size: 11 } },
+    legend: { orientation: 'h', y: 1.08, x: 0 },
+    shapes: shapes.map(s => s.line),
+    annotations: shapes.map(s => s.anno),
+  };
+
+  Plotly.newPlot('chart', [callTrace, putTrace, netTrace], layout, {responsive: true, displayModeBar: false});
+}
+
+function hline(yval, color, text, dash, side) {
+  const onLeft = side === 'left';
+  return {
+    line: { type: 'line', x0: 0, x1: 1, xref: 'paper', y0: yval, y1: yval,
+            line: { color: color, width: 2, dash: dash } },
+    anno: { x: onLeft ? 0 : 1, xref: 'paper', y: yval,
+            xanchor: onLeft ? 'right' : 'left',
+            text: onLeft ? (text + ' ') : (' ' + text),
+            showarrow: false, font: { color: color, size: 11, weight: 700 } }
+  };
+}
+
+load();
+</script>
+</body>
+</html>
