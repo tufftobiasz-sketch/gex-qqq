@@ -13,9 +13,13 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from curl_cffi import requests as creq
 import numpy as np
-from scipy.stats import norm
 from datetime import datetime, date, timezone
 import os, ssl, platform, time
+
+# gęstość rozkładu normalnego (zamiast scipy — żeby uniknąć ciężkiej instalacji)
+_SQRT_2PI = np.sqrt(2 * np.pi)
+def norm_pdf(x):
+    return np.exp(-0.5 * np.square(x)) / _SQRT_2PI
 
 app = Flask(__name__)
 CORS(app)
@@ -104,7 +108,7 @@ def bs_gamma(S, K, T, sigma, r=RISK_FREE):
     if T <= 0 or sigma <= 0 or S <= 0 or K <= 0:
         return 0.0
     d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
-    return norm.pdf(d1) / (S * sigma * np.sqrt(T))
+    return norm_pdf(d1) / (S * sigma * np.sqrt(T))
 
 
 def years_to_expiry(unix_ts):
@@ -184,7 +188,7 @@ def compute_gex(selected_expiry=None):
 
     def total_gex_at(S):
         d1 = (np.log(S / aK) + (RISK_FREE + 0.5 * aIV ** 2) * aT) / (aIV * np.sqrt(aT))
-        g = norm.pdf(d1) / (S * aIV * np.sqrt(aT))
+        g = norm_pdf(d1) / (S * aIV * np.sqrt(aT))
         return float(np.sum(aSIGN * g * aOI * 100 * S * S * 0.01))
 
     prices = np.linspace(spot * 0.85, spot * 1.15, 600)
