@@ -9,7 +9,7 @@ Pobieranie wprost jest stabilniejsze. curl_cffi udaje przeglądarkę Chrome (Yah
 a na Windowsie używamy certyfikatów z magazynu systemu, bo antywirus (Avast) skanuje HTTPS.
 """
 
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from curl_cffi import requests as creq
 import numpy as np
@@ -22,11 +22,12 @@ CORS(app)
 
 TICKER = "QQQ"
 RISK_FREE = 0.045          # stopa wolna od ryzyka (~4.5%)
-NUM_EXPIRIES = 3           # ile najbliższych terminów wygaśnięcia brać pod uwagę
-STRIKE_WINDOW = 0.06       # strike'i +/- 6% od ceny spot (reszta to szum)
+AGG_EXPIRIES = 3           # ile najbliższych terminów sumować w trybie "suma"
+STRIKE_WINDOW = 0.10       # okno do WYKRESU/ścian: +/- 10% od ceny spot
+FLIP_WINDOW = 0.25         # okno do liczenia gamma flip: +/- 25% (cały istotny łańcuch)
 CACHE_TTL = 300            # cache na 5 min, żeby nie odpytywać Yahoo za często
 
-_cache = {"ts": 0, "data": None}
+_cache = {}                # klucz: wybór wygaśnięcia -> {"ts":.., "data":..}
 _BUNDLE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "win_ca_bundle.pem")
 
 
@@ -68,20 +69,30 @@ def fetch_spot(s):
     return float(j["chart"]["result"][0]["meta"]["regularMarketPrice"])
 
 
-def fetch_options(s, crumb):
-    """Zwraca (lista_expiry_unix, dict{expiry_unix: {'calls':[...], 'puts':[...]}})."""
+def _unix_to_date(u):
+    return datetime.fromtimestamp(u, tz=timezone.utc).strftime("%Y-%m-%d")
+
+
+def fetch_expiry_map(s, crumb):
+    """Pobiera listę wszystkich terminów wygaśnięcia (z Yahoo) + pierwszy łańcuch.
+    Zwraca: (mapa {data->unix}, prefetched {unix->chain})."""
     base = f"https://query1.finance.yahoo.com/v7/finance/options/{TICKER}"
     first = s.get(base, params={"crumb": crumb}, timeout=20).json()
     result = first["optionChain"]["result"][0]
-    all_expiries = result["expirationDates"][:NUM_EXPIRIES]
+    expmap = {_unix_to_date(u): u for u in result["expirationDates"]}
+    first_chain = result["options"][0]
+    prefetched = {first_chain["expirationDate"]: first_chain}
+    return expmap, prefetched
 
-    chains = {result["options"][0]["expirationDate"]: result["options"][0]}
-    for exp in all_expiries:
-        if exp in chains:
-            continue
-        j = s.get(base, params={"date": exp, "crumb": crumb}, timeout=20).json()
-        chains[exp] = j["optionChain"]["result"][0]["options"][0]
-    return all_expiries, chains
+
+def fetch_chain(s, crumb, exp_unix, prefetched):
+    if exp_unix in prefetched:
+        return prefetched[exp_unix]
+    base = f"https://query1.finance.yahoo.com/v7/finance/options/{TICKER}"
+    j = s.get(base, params={"date": exp_unix, "crumb": crumb}, timeout=20).json()
+    chain = j["optionChain"]["result"][0]["options"][0]
+    prefetched[exp_unix] = chain
+    return chain
 
 
 # --------------------------------------------------------------------------- #
@@ -102,39 +113,57 @@ def years_to_expiry(unix_ts):
     return max(days, 1) / 365.0
 
 
-def compute_gex():
-    # cache
-    if _cache["data"] and (time.time() - _cache["ts"] < CACHE_TTL):
-        return _cache["data"]
+def compute_gex(selected_expiry=None):
+    """selected_expiry: data 'YYYY-MM-DD' (jeden termin) albo None (suma najbliższych)."""
+    cache_key = selected_expiry or "aggregate"
+    cached = _cache.get(cache_key)
+    if cached and (time.time() - cached["ts"] < CACHE_TTL):
+        return cached["data"]
 
     s, crumb = make_session()
     spot = fetch_spot(s)
-    expiries, chains = fetch_options(s, crumb)
+    expmap, prefetched = fetch_expiry_map(s, crumb)
 
-    low, high = spot * (1 - STRIKE_WINDOW), spot * (1 + STRIKE_WINDOW)
-    strike_gex = {}   # strike -> {'call':..,'put':..}
+    available = sorted(expmap.keys())
 
-    for exp in expiries:
-        chain = chains.get(exp)
-        if not chain:
-            continue
-        T = years_to_expiry(exp)
+    # ustal które wygaśnięcia liczymy
+    if selected_expiry == "agg":
+        selected_expiry = None                       # tryb sumy
+        target_dates = available[:AGG_EXPIRIES]
+    elif selected_expiry and selected_expiry in expmap:
+        target_dates = [selected_expiry]             # konkretny dzień
+    else:
+        selected_expiry = available[0]               # DOMYŚLNIE: najbliższe wygaśnięcie
+        target_dates = [available[0]]
+
+    disp_low, disp_high = spot * (1 - STRIKE_WINDOW), spot * (1 + STRIKE_WINDOW)
+    flip_low, flip_high = spot * (1 - FLIP_WINDOW), spot * (1 + FLIP_WINDOW)
+    strike_gex = {}
+    # zbieramy surowe opcje (szersze okno) do profilu gammy / gamma flip
+    opt_K, opt_T, opt_IV, opt_OI, opt_SIGN = [], [], [], [], []
+
+    for d in target_dates:
+        exp_unix = expmap[d]
+        T = years_to_expiry(exp_unix)
+        chain = fetch_chain(s, crumb, exp_unix, prefetched)
         for opt_type, key in (("call", "calls"), ("put", "puts")):
+            sign = 1.0 if opt_type == "call" else -1.0   # dealerzy long call / short put
             for o in chain.get(key, []):
                 K = float(o.get("strike", 0))
-                if K < low or K > high:
+                if K < flip_low or K > flip_high:
                     continue
                 oi = float(o.get("openInterest", 0) or 0)
                 iv = float(o.get("impliedVolatility", 0) or 0)
                 if oi <= 0 or iv <= 0:
                     continue
-                gamma = bs_gamma(spot, K, T, iv)
-                gex = gamma * oi * 100 * spot * spot * 0.01   # GEX na 1% ruchu
-                bucket = strike_gex.setdefault(K, {"call": 0.0, "put": 0.0})
-                if opt_type == "call":
-                    bucket["call"] += gex          # dealerzy long gamma na callach
-                else:
-                    bucket["put"] -= gex           # dealerzy short gamma na putach
+                # cały łańcuch (±25%) idzie do profilu gammy / flip
+                opt_K.append(K); opt_T.append(T); opt_IV.append(iv)
+                opt_OI.append(oi); opt_SIGN.append(sign)
+                # tylko ±10% idzie na wykres słupkowy i do ścian
+                if disp_low <= K <= disp_high:
+                    gex = bs_gamma(spot, K, T, iv) * oi * 100 * spot * spot * 0.01
+                    bucket = strike_gex.setdefault(K, {"call": 0.0, "put": 0.0})
+                    bucket["call" if sign > 0 else "put"] += sign * gex
 
     if not strike_gex:
         raise RuntimeError("Brak danych opcji w oknie strike'ów (giełda zamknięta?).")
@@ -143,25 +172,34 @@ def compute_gex():
     calls = [strike_gex[k]["call"] for k in strikes]
     puts = [strike_gex[k]["put"] for k in strikes]
     nets = [c + p for c, p in zip(calls, puts)]
+    cumulative = np.cumsum(nets)
 
     call_wall = max(strikes, key=lambda k: strike_gex[k]["call"])
     put_wall = min(strikes, key=lambda k: strike_gex[k]["put"])
 
-    # Inflection (gamma flip): strike gdzie skumulowany Net GEX przechodzi przez zero.
-    # Może być kilka przejść — wybieramy to najbliższe cenie spot (główny flip).
-    cumulative = np.cumsum(nets)
-    crossings = []
-    for i in range(1, len(cumulative)):
-        if (cumulative[i - 1] < 0 <= cumulative[i]) or (cumulative[i - 1] >= 0 > cumulative[i]):
-            x0, x1 = strikes[i - 1], strikes[i]
-            y0, y1 = cumulative[i - 1], cumulative[i]
-            crossings.append(round(x0 + (x1 - x0) * (-y0) / (y1 - y0), 2))
-    if crossings:
-        inflection = min(crossings, key=lambda x: abs(x - spot))
-    else:
-        inflection = strikes[int(np.argmin(np.abs(cumulative)))]
+    # --- Gamma flip metodą profilu: dla różnych hipotetycznych cen liczymy
+    #     całkowitą gammę dealerów i szukamy gdzie zmienia znak (to prawdziwy flip) ---
+    aK = np.array(opt_K); aT = np.array(opt_T); aIV = np.array(opt_IV)
+    aOI = np.array(opt_OI); aSIGN = np.array(opt_SIGN)
 
-    is_positive = spot > inflection
+    def total_gex_at(S):
+        d1 = (np.log(S / aK) + (RISK_FREE + 0.5 * aIV ** 2) * aT) / (aIV * np.sqrt(aT))
+        g = norm.pdf(d1) / (S * aIV * np.sqrt(aT))
+        return float(np.sum(aSIGN * g * aOI * 100 * S * S * 0.01))
+
+    prices = np.linspace(spot * 0.85, spot * 1.15, 600)
+    profile = np.array([total_gex_at(S) for S in prices])
+    flips = []
+    for i in range(1, len(profile)):
+        if (profile[i - 1] < 0 <= profile[i]) or (profile[i - 1] >= 0 > profile[i]):
+            x0, x1 = prices[i - 1], prices[i]
+            y0, y1 = profile[i - 1], profile[i]
+            flips.append(round(x0 + (x1 - x0) * (-y0) / (y1 - y0), 2))
+    inflection = (min(flips, key=lambda x: abs(x - spot)) if flips
+                  else round(float(prices[int(np.argmin(np.abs(profile)))]), 2))
+
+    # regime liczymy WPROST ze znaku całkowitej gammy przy obecnej cenie (nie ze spot vs flip)
+    is_positive = total_gex_at(spot) > 0
     if is_positive:
         day_type, day_state = "BALANCE DAY", "balance"
         day_desc = "Dodatnia gamma — dealerzy tłumią ruchy. Rynek mean-reverting (zakres)."
@@ -173,6 +211,10 @@ def compute_gex():
         "ticker": TICKER,
         "spot": round(spot, 2),
         "updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "available_expiries": available,
+        "selected_expiry": selected_expiry,      # None = suma
+        "agg_count": AGG_EXPIRIES,
+        "strike_window_pct": int(STRIKE_WINDOW * 100),
         "strikes": strikes,
         "call_gex": calls,
         "put_gex": puts,
@@ -186,7 +228,7 @@ def compute_gex():
         "day_desc": day_desc,
         "day_state": day_state,
     }
-    _cache.update(ts=time.time(), data=data)
+    _cache[cache_key] = {"ts": time.time(), "data": data}
     return data
 
 
@@ -196,8 +238,9 @@ def compute_gex():
 
 @app.route("/api/gex")
 def api_gex():
+    expiry = request.args.get("expiry") or None
     try:
-        return jsonify({"ok": True, "data": compute_gex()})
+        return jsonify({"ok": True, "data": compute_gex(expiry)})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 

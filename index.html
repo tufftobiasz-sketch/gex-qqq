@@ -3,84 +3,137 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GEX QQQ — Tobias</title>
+  <title>GEX TERMINAL — QQQ</title>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
+    :root {
+      --steel: #6f9bff; --ice: #d6dde9; --silver: #8a93a6;
+      --emerald: #34d399; --crimson: #fb6f6f;
+      --ink: #eef0f5; --muted: #767d8e; --line: rgba(255,255,255,.07);
+    }
+
     body {
-      font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-      min-height: 100vh;
-      color: #1a1a2e;
-      /* jasne, delikatne tło z kolorowymi plamami */
+      font-family: 'Inter', -apple-system, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh; color: var(--ink); position: relative; overflow-x: hidden;
       background:
-        radial-gradient(circle at 15% 20%, #dbeafe 0%, transparent 45%),
-        radial-gradient(circle at 85% 15%, #fce7f3 0%, transparent 45%),
-        radial-gradient(circle at 50% 90%, #d1fae5 0%, transparent 50%),
-        #f4f6fb;
-      padding: 24px;
+        radial-gradient(circle at 15% -5%, rgba(111,155,255,.10) 0%, transparent 40%),
+        radial-gradient(circle at 90% 0%, rgba(255,255,255,.04) 0%, transparent 42%),
+        #050507;
+      padding: 26px;
+    }
+    body::before { /* siatka HUD jak w Batcave */
+      content: ''; position: fixed; inset: 0; z-index: -1; opacity: .4;
+      background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size: 48px 48px; mask-image: radial-gradient(circle at 50% 25%, #000 0%, transparent 78%);
     }
 
-    .wrap { max-width: 1100px; margin: 0 auto; }
+    .wrap { max-width: 1120px; margin: 0 auto; }
 
-    /* szklane karty z blur */
     .glass {
-      background: rgba(255, 255, 255, 0.55);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-      border: 1px solid rgba(255, 255, 255, 0.8);
-      border-radius: 22px;
-      box-shadow: 0 8px 32px rgba(31, 38, 135, 0.12);
+      background: linear-gradient(165deg, rgba(18,19,24,.82), rgba(9,10,13,.78));
+      backdrop-filter: blur(20px) saturate(120%); -webkit-backdrop-filter: blur(20px) saturate(120%);
+      border: 1px solid var(--line); border-radius: 16px;
+      box-shadow: 0 18px 55px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.04);
+      animation: rise .5s cubic-bezier(.2,.7,.3,1) both;
     }
+    @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
-    .hero { padding: 32px 36px; margin-bottom: 22px; }
-    .hero h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
-    .hero p { color: #5b6478; margin-top: 6px; font-size: 15px; }
-
-    /* górne kafelki z poziomami */
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 14px;
-      margin-bottom: 22px;
+    /* HERO */
+    .hero { padding: 36px 38px; margin-bottom: 20px; position: relative; overflow: hidden; }
+    .hero::after { content:''; position:absolute; top:0; left:0; right:0; height:1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent); }
+    .overline { font-size: 11px; letter-spacing: 5px; text-transform: uppercase; color: var(--silver); font-weight: 700; }
+    .brand {
+      font-family: 'Bebas Neue', sans-serif; font-size: 66px; line-height: .9; letter-spacing: 3px; margin: 8px 0 0;
+      background: linear-gradient(180deg, #ffffff 0%, #aeb6c6 55%, #4a5161 100%);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
     }
-    .stat { padding: 18px 20px; }
-    .stat .label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #8a92a6; }
-    .stat .value { font-size: 24px; font-weight: 700; margin-top: 6px; }
-    .stat .sub { font-size: 12px; color: #8a92a6; margin-top: 2px; }
+    .greet { font-size: 16px; color: var(--ink); font-weight: 600; margin-top: 14px; }
+    .motto { font-size: 12.5px; color: var(--silver); font-style: italic; margin-top: 6px; padding-left: 12px; border-left: 2px solid rgba(255,255,255,.18); }
+    .meta { color: var(--muted); margin-top: 14px; font-size: 13px; }
+    .meta b { color: var(--ink); }
+    .controls { margin-top: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .controls label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+    .controls select {
+      border: 1px solid var(--line); background: rgba(0,0,0,.5); color: var(--ink);
+      padding: 9px 13px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+    }
+    .controls select:hover { border-color: var(--steel); }
 
-    .c-spot   { color: #2563eb; }
-    .c-call   { color: #16a34a; }
-    .c-put    { color: #dc2626; }
-    .c-inflec { color: #9333ea; }
+    /* STATS */
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .stat { padding: 18px 20px; position: relative; overflow: hidden; transition: transform .2s, border-color .2s; }
+    .stat:hover { transform: translateY(-4px); border-color: var(--accent); }
+    .stat::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: var(--accent, #555); box-shadow: 0 0 14px var(--accent); }
+    .stat .label { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); font-weight: 700; }
+    .stat .value { font-family: 'Bebas Neue', sans-serif; font-size: 38px; line-height: 1; margin-top: 9px; color: var(--accent); letter-spacing: 1px; }
+    .stat .sub { font-size: 11px; color: var(--muted); margin-top: 5px; }
+    .stat .ic { position: absolute; right: 16px; top: 16px; font-size: 18px; opacity: .35; }
+    .s-spot   { --accent: var(--steel); }
+    .s-call   { --accent: var(--emerald); }
+    .s-put    { --accent: var(--crimson); }
+    .s-inflec { --accent: var(--ice); }
 
-    /* baner typu dnia */
-    .dayban { padding: 20px 24px; margin-bottom: 22px; display: flex; align-items: center; gap: 16px; }
+    /* DAY BANNER */
+    .dayban { padding: 22px 26px; margin-bottom: 20px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
     .dayban .badge {
-      font-size: 18px; font-weight: 800; padding: 10px 18px; border-radius: 14px; white-space: nowrap;
+      font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 2px; padding: 8px 22px; border-radius: 10px; white-space: nowrap; color: #050507;
     }
-    .badge.balance { background: rgba(22,163,74,.15); color: #15803d; }
-    .badge.trend   { background: rgba(220,38,38,.15); color: #b91c1c; }
-    .dayban .desc { font-size: 14px; color: #4b5568; }
+    .badge.balance { background: linear-gradient(135deg, #6ee7b7, #10b981); box-shadow: 0 0 28px rgba(16,185,129,.45); }
+    .badge.trend   { background: linear-gradient(135deg, #fca5a5, #ef4444); box-shadow: 0 0 28px rgba(239,68,68,.45); }
+    .dayban .desc { font-size: 14px; color: #b7bcc9; font-weight: 500; flex: 1; min-width: 220px; }
 
-    .chartcard { padding: 18px; }
-    #chart { width: 100%; height: 620px; }
+    /* GUIDE */
+    .guide { padding: 24px 28px; margin-bottom: 20px; border-left: 3px solid var(--gc, var(--steel)); }
+    .guide h2 { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1.5px; display: flex; align-items: center; gap: 9px; color: var(--ink); }
+    .guide .mean { color: #b7bcc9; font-size: 14px; margin: 12px 0 16px; line-height: 1.6; }
+    .guide .mean b { color: var(--gc, var(--steel)); }
+    .guide ul { list-style: none; display: grid; gap: 10px; }
+    .guide li { font-size: 14px; padding-left: 26px; position: relative; line-height: 1.45; color: #ccd0da; }
+    .guide li b { color: #fff; }
+    .guide li::before { content: '▸'; position: absolute; left: 0; top: 0; font-weight: 900; color: var(--gc, var(--steel)); }
+    .guide.balance { --gc: var(--emerald); }
+    .guide.trend   { --gc: var(--crimson); }
 
-    .footer { text-align: center; color: #9aa2b6; font-size: 12px; margin-top: 18px; }
+    .chartcard { padding: 18px; margin-bottom: 20px; }
+    #chart { width: 100%; height: 640px; }
+
+    /* CHEAT SHEET */
+    details.cheat { padding: 4px 28px; margin-bottom: 20px; }
+    details.cheat summary { cursor: pointer; font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 1.5px; padding: 18px 0; list-style: none; display: flex; align-items: center; gap: 8px; }
+    details.cheat summary::-webkit-details-marker { display: none; }
+    details.cheat summary::after { content: '▾'; margin-left: auto; transition: .25s; color: var(--steel); }
+    details.cheat[open] summary::after { transform: rotate(180deg); }
+    .cheat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding-bottom: 22px; }
+    .cheat-card { background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+    .cheat-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 7px; display: flex; align-items: center; gap: 7px; color: #fff; }
+    .cheat-card p { font-size: 13px; color: #a3a8b6; line-height: 1.55; }
+    .cheat-card p b { color: var(--ice); }
+    .tag { font-family: 'Bebas Neue', sans-serif; font-size: 15px; padding: 1px 9px; border-radius: 6px; letter-spacing: 1px; }
+    .tag.pos { background: rgba(16,185,129,.2); color: #6ee7b7; }
+    .tag.neg { background: rgba(239,68,68,.2); color: #fca5a5; }
+
+    .footer { text-align: center; color: var(--muted); font-size: 11.5px; margin-top: 18px; line-height: 1.7; }
     .refresh {
-      cursor: pointer; border: none; background: rgba(37,99,235,.12); color: #2563eb;
-      font-weight: 600; padding: 8px 16px; border-radius: 12px; font-size: 13px;
+      cursor: pointer; border: 1px solid rgba(255,255,255,.18); color: var(--ink); font-weight: 700; padding: 9px 18px;
+      border-radius: 10px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; font-family: inherit;
+      background: rgba(255,255,255,.04); transition: .2s;
     }
-    .refresh:hover { background: rgba(37,99,235,.2); }
+    .refresh:hover { background: var(--ink); color: #050507; box-shadow: 0 0 22px rgba(255,255,255,.18); }
 
-    .loading, .error { padding: 40px; text-align: center; font-size: 16px; }
-    .error { color: #dc2626; }
+    .loading, .error { padding: 50px; text-align: center; font-size: 16px; color: var(--muted); }
+    .error { color: var(--crimson); }
 
-    @media (max-width: 640px) {
+    @media (max-width: 700px) {
       body { padding: 14px; }
-      .hero { padding: 24px; }
-      .hero h1 { font-size: 21px; }
-      #chart { height: 520px; }
+      .hero { padding: 24px; } .brand { font-size: 46px; }
+      #chart { height: 540px; }
+      .cheat-grid { grid-template-columns: 1fr; }
+      details.cheat, .guide, .dayban { padding-left: 20px; padding-right: 20px; }
     }
   </style>
 </head>
@@ -88,32 +141,56 @@
   <div class="wrap">
 
     <div class="glass hero">
-      <h1>Welcome Tobias 👋 here's ur trading informations, have fun</h1>
-      <p>Gamma Exposure (GEX) dla <b id="tk">QQQ</b> · ostatnia aktualizacja: <span id="upd">—</span>
-         &nbsp;<button class="refresh" onclick="load()">↻ Odśwież</button></p>
+      <div class="overline">Gotham markets · live feed</div>
+      <div class="brand">GEX TERMINAL</div>
+      <div class="greet" id="greet">Witaj z powrotem.</div>
+      <div class="motto" id="motto">„Dlaczego upadamy? Żeby nauczyć się wstawać.”</div>
+      <div class="meta">Gamma Exposure · <b id="tk">QQQ</b> · ostatnia aktualizacja: <span id="upd">—</span></div>
+      <div class="controls">
+        <label for="expiry">Wygaśnięcie</label>
+        <select id="expiry" onchange="onExpiryChange()"></select>
+        <button class="refresh" onclick="reload()">↻ Odśwież</button>
+      </div>
     </div>
 
     <div id="content">
       <div class="glass loading">⏳ Pobieram dane opcji QQQ…</div>
     </div>
 
-    <div class="footer">Dane: yfinance (~15 min opóźnienia) · Open Interest aktualizowany raz dziennie · Tylko do użytku osobistego</div>
+    <div class="footer" id="footer">Dane: Yahoo Finance (~15 min opóźnienia) · Open Interest aktualizowany raz dziennie · Tylko do użytku osobistego</div>
   </div>
 
 <script>
-// Jeśli strona otwarta jako plik (file://) zamiast przez serwer,
-// celuj wprost w lokalny serwer Flask.
-const API = (location.protocol === 'file:' || !location.host)
-  ? 'http://localhost:5000/api/gex'
-  : '/api/gex';
+const API = (location.protocol === 'file:' || !location.host) ? 'http://localhost:5000/api/gex' : '/api/gex';
+let currentExpiry = '';
+
+// dynamiczne powitanie wg pory dnia + losowe motto
+(function initHero() {
+  const h = new Date().getHours();
+  const part = h < 5 ? 'Noc nie śpi' : h < 12 ? 'Dzień dobry' : h < 18 ? 'Dobre popołudnie' : 'Dobry wieczór';
+  document.getElementById('greet').textContent = part + ', Tobias.';
+  const mottos = [
+    '„Dlaczego upadamy? Żeby nauczyć się wstawać.”',
+    '„Liczby nie kłamią. Strach kłamie.”',
+    '„Cierpliwość to też pozycja.”',
+    '„Dyscyplina dziś — wolność jutro.”',
+    '„Plan. Cierpliwość. Egzekucja.”'
+  ];
+  document.getElementById('motto').textContent = mottos[Math.floor(Math.random() * mottos.length)];
+})();
+
+function onExpiryChange() { currentExpiry = document.getElementById('expiry').value; load(); }
+function reload() { load(); }
 
 async function load() {
   const content = document.getElementById('content');
   content.innerHTML = '<div class="glass loading">⏳ Pobieram dane opcji QQQ…</div>';
   try {
-    const res = await fetch(API);
+    const url = API + (currentExpiry ? ('?expiry=' + encodeURIComponent(currentExpiry)) : '');
+    const res = await fetch(url);
     const json = await res.json();
     if (!json.ok) throw new Error(json.error);
+    fillExpiries(json.data);
     render(json.data);
   } catch (e) {
     content.innerHTML = '<div class="glass error">❌ Błąd: ' + e.message +
@@ -121,17 +198,60 @@ async function load() {
   }
 }
 
+function fillExpiries(d) {
+  const sel = document.getElementById('expiry');
+  if (sel.options.length === 0) {
+    (d.available_expiries || []).forEach(date => {
+      const o = document.createElement('option'); o.value = date; o.textContent = date; sel.appendChild(o);
+    });
+    const agg = document.createElement('option');
+    agg.value = 'agg'; agg.textContent = 'Suma ' + d.agg_count + ' najbliższych'; sel.appendChild(agg);
+  }
+  sel.value = d.selected_expiry ? d.selected_expiry : 'agg';
+  currentExpiry = sel.value;
+}
+
+function guidance(d) {
+  if (d.day_state === 'balance') {
+    return {
+      title: '🟢 Co robić — DZIEŃ ZAKRESOWY (Balance)',
+      mean: 'Gamma jest <b>dodatnia</b> (cena nad Inflection $' + d.inflection + '). Dealerzy kupują gdy spada i sprzedają gdy rośnie — <b>tłumią ruchy</b>. Rynek wraca do środka (mean-reversion), zmienność niższa.',
+      tips: [
+        'Graj <b>odbicia od ścian</b>: Put Wall $' + d.put_wall + ' jako wsparcie, Call Wall $' + d.call_wall + ' jako opór.',
+        '<b>Fade ekstremów</b> — sprzedawanie skrajności działa lepiej niż gonienie przebić.',
+        'Spodziewaj się <b>pinningu</b> ceny do dużych strike\'ów i wąskiego zakresu.',
+        'Ostrożnie z przebiciami — w dodatniej gammie często są <b>fałszywe</b>.'
+      ]
+    };
+  }
+  return {
+    title: '🔴 Co robić — DZIEŃ TRENDOWY (Trend / Imbalance)',
+    mean: 'Gamma jest <b>ujemna</b> (cena pod Inflection $' + d.inflection + '). Dealerzy sprzedają gdy spada i kupują gdy rośnie — <b>wzmacniają ruchy</b>. Rynek kontynuuje kierunek (momentum), zmienność wyższa.',
+    tips: [
+      'Graj <b>z trendem / momentum</b> — przebicia ścian są mocniejsze i prawdziwsze.',
+      'Większe świece i szybsze ruchy → używaj <b>szerszych stopów</b>.',
+      'Przebicie Inflection $' + d.inflection + ' <b>w dół</b> = ryzyko przyspieszenia spadków.',
+      'Uważaj na <b>gwałtowne ruchy w obie strony</b> — dzień podwyższonego ryzyka.'
+    ]
+  };
+}
+
 function render(d) {
   document.getElementById('tk').textContent = d.ticker;
   document.getElementById('upd').textContent = d.updated;
 
+  const scope = d.selected_expiry ? ('wygaśnięcie ' + d.selected_expiry) : ('suma ' + d.agg_count + ' najbliższych wygaśnięć');
+  document.getElementById('footer').textContent =
+    'Zakres: ' + scope + ' · strike ±' + d.strike_window_pct + '% · Dane: Yahoo Finance (~15 min opóźnienia) · OI raz dziennie · Tylko do użytku osobistego';
+
+  const g = guidance(d);
   const content = document.getElementById('content');
   content.innerHTML = `
     <div class="stats">
-      <div class="glass stat"><div class="label">Spot</div><div class="value c-spot">$${d.spot}</div><div class="sub">cena ${d.ticker}</div></div>
-      <div class="glass stat"><div class="label">Call Wall</div><div class="value c-call">$${d.call_wall}</div><div class="sub">opór</div></div>
-      <div class="glass stat"><div class="label">Put Wall</div><div class="value c-put">$${d.put_wall}</div><div class="sub">wsparcie</div></div>
-      <div class="glass stat"><div class="label">Inflection</div><div class="value c-inflec">$${d.inflection}</div><div class="sub">gamma flip</div></div>
+      <div class="glass stat s-spot"><span class="ic">📍</span><div class="label">Spot</div><div class="value">$${d.spot}</div><div class="sub">cena ${d.ticker}</div></div>
+      <div class="glass stat s-call"><span class="ic">🟢</span><div class="label">Call Wall</div><div class="value">$${d.call_wall}</div><div class="sub">opór</div></div>
+      <div class="glass stat s-put"><span class="ic">🔴</span><div class="label">Put Wall</div><div class="value">$${d.put_wall}</div><div class="sub">wsparcie</div></div>
+      <div class="glass stat s-inflec"><span class="ic">⚡</span><div class="label">Inflection</div><div class="value">$${d.inflection}</div><div class="sub">gamma flip</div></div>
     </div>
 
     <div class="glass dayban">
@@ -139,44 +259,49 @@ function render(d) {
       <div class="desc">${d.day_desc}</div>
     </div>
 
+    <div class="glass guide ${d.day_state}">
+      <h2>${g.title}</h2>
+      <p class="mean">${g.mean}</p>
+      <ul>${g.tips.map(t => '<li>' + t + '</li>').join('')}</ul>
+    </div>
+
     <div class="glass chartcard"><div id="chart"></div></div>
+
+    <details class="glass cheat">
+      <summary>📚 Ściągawka GEX — co oznaczają poziomy (kliknij)</summary>
+      <div class="cheat-grid">
+        <div class="cheat-card"><h3><span class="tag pos">+γ</span> Dodatnia gamma = Balance Day</h3><p>Dealerzy tłumią ruchy. Rynek w zakresie, wraca do środka. Sprzyja sprzedawaniu skrajności i graniu odbić od ścian. Niższa zmienność.</p></div>
+        <div class="cheat-card"><h3><span class="tag neg">−γ</span> Ujemna gamma = Trend Day (Imbalance)</h3><p>Dealerzy wzmacniają ruchy. Rynek kierunkowy, momentum. Sprzyja graniu z trendem. Wyższa zmienność i ryzyko — szersze stopy.</p></div>
+        <div class="cheat-card"><h3>🟢 Call Wall</h3><p>Strike z największą dodatnią gammą — działa jak <b>magnes/opór</b> od góry. Cena często ma trudność, żeby go trwale przebić w górę.</p></div>
+        <div class="cheat-card"><h3>🔴 Put Wall</h3><p>Strike z największą ujemną gammą — działa jak <b>wsparcie</b> od dołu. Częsty punkt, gdzie spadki wyhamowują.</p></div>
+        <div class="cheat-card"><h3>⚡ Inflection (gamma flip)</h3><p>Cena, przy której gamma zmienia znak. <b>Nad nią</b> = reżim zakresowy. <b>Pod nią</b> = reżim trendowy. Najważniejszy poziom do obserwacji.</p></div>
+        <div class="cheat-card"><h3>📈 Net GEX (linia)</h3><p>Skumulowana gamma netto. Pokazuje ogólny rozkład siły dealerów wzdłuż strike\'ów — gdzie dominują call'e, a gdzie put'y.</p></div>
+      </div>
+    </details>
   `;
 
   drawChart(d);
 }
 
 function drawChart(d) {
-  const callTrace = {
-    type: 'bar', orientation: 'h', name: 'Call GEX',
-    y: d.strikes, x: d.call_gex,
-    marker: { color: 'rgba(22,163,74,0.75)' }
-  };
-  const putTrace = {
-    type: 'bar', orientation: 'h', name: 'Put GEX',
-    y: d.strikes, x: d.put_gex,
-    marker: { color: 'rgba(220,38,38,0.75)' }
-  };
-  const netTrace = {
-    type: 'scatter', mode: 'lines', name: 'Net GEX (Cumulative)',
-    y: d.strikes, x: d.cumulative_gex,
-    line: { color: '#f59e0b', width: 3 }
-  };
+  const callTrace = { type: 'bar', orientation: 'h', name: 'Call GEX', y: d.strikes, x: d.call_gex, marker: { color: 'rgba(52,211,153,0.8)' } };
+  const putTrace  = { type: 'bar', orientation: 'h', name: 'Put GEX',  y: d.strikes, x: d.put_gex,  marker: { color: 'rgba(251,111,111,0.8)' } };
+  const netTrace  = { type: 'scatter', mode: 'lines', name: 'Net GEX (Cumulative)', y: d.strikes, x: d.cumulative_gex, line: { color: '#d6dde9', width: 3 } };
 
   const shapes = [
-    hline(d.spot,       '#2563eb', 'Spot $' + d.spot,           'dash',    'left'),
-    hline(d.call_wall,  '#16a34a', 'Call Wall $' + d.call_wall, 'dot',     'right'),
-    hline(d.put_wall,   '#dc2626', 'Put Wall $' + d.put_wall,   'dot',     'right'),
-    hline(d.inflection, '#9333ea', 'Inflection $' + d.inflection, 'dashdot', 'right'),
+    hline(d.spot,       '#6f9bff', 'Spot $' + d.spot,             'dash',    'left'),
+    hline(d.call_wall,  '#34d399', 'Call Wall $' + d.call_wall,   'dot',     'right'),
+    hline(d.put_wall,   '#fb6f6f', 'Put Wall $' + d.put_wall,     'dot',     'right'),
+    hline(d.inflection, '#d6dde9', 'Inflection $' + d.inflection, 'dashdot', 'right'),
   ];
 
   const layout = {
     barmode: 'overlay',
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    plot_bgcolor: 'rgba(255,255,255,0.3)',
-    font: { color: '#1a1a2e', family: 'Segoe UI, sans-serif' },
-    margin: { l: 60, r: 120, t: 30, b: 40 },
-    xaxis: { title: 'GEX', zeroline: true, zerolinecolor: '#aab', gridcolor: 'rgba(0,0,0,0.06)' },
-    yaxis: { title: 'Strike', gridcolor: 'rgba(0,0,0,0.06)', dtick: 5, tickfont: { size: 11 } },
+    paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(255,255,255,0.012)',
+    font: { color: '#b7bcc9', family: 'Inter, sans-serif' },
+    margin: { l: 64, r: 130, t: 30, b: 44 },
+    xaxis: { title: 'GEX', zeroline: true, zerolinecolor: 'rgba(255,255,255,.25)', gridcolor: 'rgba(255,255,255,0.05)' },
+    yaxis: { title: 'Strike', gridcolor: 'rgba(255,255,255,0.05)', dtick: 5, tickfont: { size: 11 } },
     legend: { orientation: 'h', y: 1.08, x: 0 },
     shapes: shapes.map(s => s.line),
     annotations: shapes.map(s => s.anno),
@@ -188,12 +313,9 @@ function drawChart(d) {
 function hline(yval, color, text, dash, side) {
   const onLeft = side === 'left';
   return {
-    line: { type: 'line', x0: 0, x1: 1, xref: 'paper', y0: yval, y1: yval,
-            line: { color: color, width: 2, dash: dash } },
-    anno: { x: onLeft ? 0 : 1, xref: 'paper', y: yval,
-            xanchor: onLeft ? 'right' : 'left',
-            text: onLeft ? (text + ' ') : (' ' + text),
-            showarrow: false, font: { color: color, size: 11, weight: 700 } }
+    line: { type: 'line', x0: 0, x1: 1, xref: 'paper', y0: yval, y1: yval, line: { color: color, width: 2, dash: dash } },
+    anno: { x: onLeft ? 0 : 1, xref: 'paper', y: yval, xanchor: onLeft ? 'right' : 'left',
+            text: onLeft ? (text + ' ') : (' ' + text), showarrow: false, font: { color: color, size: 11, weight: 700 } }
   };
 }
 
